@@ -1,12 +1,12 @@
 blueprint:
-  name: Sunricher ZGRC-KEY-013 (Selecteur Liste)
+  name: Sunricher ZGRC-KEY-013 (Selecteur Liste V3)
   description: Controle 4 groupes de lumieres via Zigbee2MQTT
   domain: automation
 
   input:
     action_sensor:
       name: Capteur Action
-      description: Selectionnez entite se terminant par _action
+      description: Selectionnez le sensor action
       selector:
         entity:
           domain: sensor
@@ -51,21 +51,17 @@ action:
       command: "{{ trigger.to_state.state }}"
 
   - choose:
-      ############################
       # GROUP 1
-      ############################
       - conditions: "{{ command == 'on_1' }}"
         sequence:
           - service: light.turn_on
             target:
               entity_id: !input light_g1
-
       - conditions: "{{ command == 'off_1' }}"
         sequence:
           - service: light.turn_off
             target:
               entity_id: !input light_g1
-
       - conditions: "{{ command == 'brightness_move_up_1' }}"
         sequence:
           - service: light.turn_on
@@ -73,7 +69,6 @@ action:
               entity_id: !input light_g1
             data:
               brightness_step: 15
-
       - conditions: "{{ command == 'brightness_move_down_1' }}"
         sequence:
           - service: light.turn_on
@@ -82,21 +77,17 @@ action:
             data:
               brightness_step: -15
 
-      ############################
       # GROUP 2
-      ############################
       - conditions: "{{ command == 'on_2' }}"
         sequence:
           - service: light.turn_on
             target:
               entity_id: !input light_g2
-
       - conditions: "{{ command == 'off_2' }}"
         sequence:
           - service: light.turn_off
             target:
               entity_id: !input light_g2
-
       - conditions: "{{ command == 'brightness_move_up_2' }}"
         sequence:
           - service: light.turn_on
@@ -104,7 +95,6 @@ action:
               entity_id: !input light_g2
             data:
               brightness_step: 15
-
       - conditions: "{{ command == 'brightness_move_down_2' }}"
         sequence:
           - service: light.turn_on
@@ -113,21 +103,17 @@ action:
             data:
               brightness_step: -15
 
-      ############################
       # GROUP 3
-      ############################
       - conditions: "{{ command == 'on_3' }}"
         sequence:
           - service: light.turn_on
             target:
               entity_id: !input light_g3
-
       - conditions: "{{ command == 'off_3' }}"
         sequence:
           - service: light.turn_off
             target:
               entity_id: !input light_g3
-
       - conditions: "{{ command == 'brightness_move_up_3' }}"
         sequence:
           - service: light.turn_on
@@ -135,7 +121,6 @@ action:
               entity_id: !input light_g3
             data:
               brightness_step: 15
-
       - conditions: "{{ command == 'brightness_move_down_3' }}"
         sequence:
           - service: light.turn_on
@@ -144,21 +129,17 @@ action:
             data:
               brightness_step: -15
 
-      ############################
       # GROUP 4
-      ############################
       - conditions: "{{ command == 'on_4' }}"
         sequence:
           - service: light.turn_on
             target:
               entity_id: !input light_g4
-
       - conditions: "{{ command == 'off_4' }}"
         sequence:
           - service: light.turn_off
             target:
               entity_id: !input light_g4
-
       - conditions: "{{ command == 'brightness_move_up_4' }}"
         sequence:
           - service: light.turn_on
@@ -166,7 +147,6 @@ action:
               entity_id: !input light_g4
             data:
               brightness_step: 15
-
       - conditions: "{{ command == 'brightness_move_down_4' }}"
         sequence:
           - service: light.turn_on
