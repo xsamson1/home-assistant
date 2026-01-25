@@ -1,105 +1,145 @@
 blueprint:
-  name: Zigbee2MQTT - Sunricher ZGRC-KEY-013
-  description: Contrôle des boutons de la télécommande Sunricher via Zigbee2MQTT
+  name: Zigbee2MQTT ULTIMATE - Sunricher ZGRC-KEY-013 Native Dimming
+  description: Native Zigbee dimming using brightness_move
   domain: automation
-  input:
-    remote:
-      name: Remote Sensor
-      description: Choisissez le capteur "action" de votre télécommande Sunricher (ex. sensor.remote_action)
-      selector:
-        entity:
-          integration: mqtt
-          domain: sensor
-    g1_on_press:
-      name: Group1 On Press
-      default: []
-      selector:
-        action: {}
-    g1_off_press:
-      name: Group1 Off Press
-      default: []
-      selector:
-        action: {}
-    g2_on_press:
-      name: Group2 On Press
-      default: []
-      selector:
-        action: {}
-    g2_off_press:
-      name: Group2 Off Press
-      default: []
-      selector:
-        action: {}
-    g3_on_press:
-      name: Group3 On Press
-      default: []
-      selector:
-        action: {}
-    g3_off_press:
-      name: Group3 Off Press
-      default: []
-      selector:
-        action: {}
-    g4_on_press:
-      name: Group4 On Press
-      default: []
-      selector:
-        action: {}
-    g4_off_press:
-      name: Group4 Off Press
-      default: []
-      selector:
-        action: {}
-    scene1_press:
-      name: Scene1
-      default: []
-      selector:
-        action: {}
-    scene2_press:
-      name: Scene2
-      default: []
-      selector:
-        action: {}
 
-mode: restart # Restart est souvent mieux pour les télécommandes pour éviter les latences
+  input:
+    remote_name:
+      name: Zigbee2MQTT friendly name of remote
+      selector:
+        text:
+
+    z2m_group1:
+      name: Zigbee2MQTT group name G1
+      selector:
+        text:
+    z2m_group2:
+      name: Zigbee2MQTT group name G2
+      selector:
+        text:
+    z2m_group3:
+      name: Zigbee2MQTT group name G3
+      selector:
+        text:
+    z2m_group4:
+      name: Zigbee2MQTT group name G4
+      selector:
+        text:
+
+mode: parallel
 max_exceeded: silent
 
 trigger:
-  - platform: state
-    entity_id: !input remote
-    # On ne met pas de "to:" pour capturer tous les changements d'état
+  - platform: mqtt
+    topic: zigbee2mqtt/+/action
+
+variables:
+  remote: !input remote_name
+  action: "{{ trigger.payload }}"
+  topic: "{{ trigger.topic }}"
+  g1: !input z2m_group1
+  g2: !input z2m_group2
+  g3: !input z2m_group3
+  g4: !input z2m_group4
+
+condition:
+  - "{{ topic == 'zigbee2mqtt/' ~ remote ~ '/action' }}"
 
 action:
-  - variables:
-      # Z2M envoie les commandes directement dans l'état de l'entité action
-      action_value: "{{ trigger.to_state.state }}"
   - choose:
-      # Groupe 1
-      - conditions: "{{ action_value == 'on_l1' }}"
-        sequence: !input g1_on_press
-      - conditions: "{{ action_value == 'off_l1' }}"
-        sequence: !input g1_off_press
-      
-      # Groupe 2
-      - conditions: "{{ action_value == 'on_l2' }}"
-        sequence: !input g2_on_press
-      - conditions: "{{ action_value == 'off_l2' }}"
-        sequence: !input g2_off_press
-      
-      # Groupe 3
-      - conditions: "{{ action_value == 'on_l3' }}"
-        sequence: !input g3_on_press
-      - conditions: "{{ action_value == 'off_l3' }}"
-        sequence: !input g3_off_press
-      
-      # Groupe 4
-      - conditions: "{{ action_value == 'on_l4' }}"
-        sequence: !input g4_on_press
-      - conditions: "{{ action_value == 'off_l4' }}"
-        sequence: !input g4_off_press
-      
-      # Scènes
-      - conditions: "{{ action_value == 'recall_1' }}"
-        sequence: !input scene1_press
-      - conditions: "{{ action_value == 'recall_2' }}"
-        sequence: !input scene2_press
+
+      ###################################################
+      # GROUP 1 DIM UP
+      ###################################################
+      - conditions: "{{ action == 'group_1_on_hold' }}"
+        sequence:
+          - service: mqtt.publish
+            data:
+              topic: "zigbee2mqtt/{{ g1 }}/set"
+              payload: '{"brightness_move": 50}'
+
+      - conditions: "{{ action == 'group_1_off_hold' }}"
+        sequence:
+          - service: mqtt.publish
+            data:
+              topic: "zigbee2mqtt/{{ g1 }}/set"
+              payload: '{"brightness_move": -50}'
+
+      - conditions: "{{ action in ['group_1_on_release','group_1_off_release'] }}"
+        sequence:
+          - service: mqtt.publish
+            data:
+              topic: "zigbee2mqtt/{{ g1 }}/set"
+              payload: '{"brightness_move": 0}'
+
+      ###################################################
+      # GROUP 2
+      ###################################################
+      - conditions: "{{ action == 'group_2_on_hold' }}"
+        sequence:
+          - service: mqtt.publish
+            data:
+              topic: "zigbee2mqtt/{{ g2 }}/set"
+              payload: '{"brightness_move": 50}'
+
+      - conditions: "{{ action == 'group_2_off_hold' }}"
+        sequence:
+          - service: mqtt.publish
+            data:
+              topic: "zigbee2mqtt/{{ g2 }}/set"
+              payload: '{"brightness_move": -50}'
+
+      - conditions: "{{ action in ['group_2_on_release','group_2_off_release'] }}"
+        sequence:
+          - service: mqtt.publish
+            data:
+              topic: "zigbee2mqtt/{{ g2 }}/set"
+              payload: '{"brightness_move": 0}'
+
+      ###################################################
+      # GROUP 3
+      ###################################################
+      - conditions: "{{ action == 'group_3_on_hold' }}"
+        sequence:
+          - service: mqtt.publish
+            data:
+              topic: "zigbee2mqtt/{{ g3 }}/set"
+              payload: '{"brightness_move": 50}'
+
+      - conditions: "{{ action == 'group_3_off_hold' }}"
+        sequence:
+          - service: mqtt.publish
+            data:
+              topic: "zigbee2mqtt/{{ g3 }}/set"
+              payload: '{"brightness_move": -50}'
+
+      - conditions: "{{ action in ['group_3_on_release','group_3_off_release'] }}"
+        sequence:
+          - service: mqtt.publish
+            data:
+              topic: "zigbee2mqtt/{{ g3 }}/set"
+              payload: '{"brightness_move": 0}'
+
+      ###################################################
+      # GROUP 4
+      ###################################################
+      - conditions: "{{ action == 'group_4_on_hold' }}"
+        sequence:
+          - service: mqtt.publish
+            data:
+              topic: "zigbee2mqtt/{{ g4 }}/set"
+              payload: '{"brightness_move": 50}'
+
+      - conditions: "{{ action == 'group_4_off_hold' }}"
+        sequence:
+          - service: mqtt.publish
+            data:
+              topic: "zigbee2mqtt/{{ g4 }}/set"
+              payload: '{"brightness_move": -50}'
+
+      - conditions: "{{ action in ['group_4_on_release','group_4_off_release'] }}"
+        sequence:
+          - service: mqtt.publish
+            data:
+              topic: "zigbee2mqtt/{{ g4 }}/set"
+              payload: '{"brightness_move": 0}'
