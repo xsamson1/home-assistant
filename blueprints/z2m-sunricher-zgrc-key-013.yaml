@@ -6,7 +6,7 @@ blueprint:
   input:
     action_sensor:
       name: Capteur Action de la télécommande
-      description: Sélectionnez l'entité qui se termine par "_action" (ex: sensor.ma_telecommande_action)
+      description: "Sélectionnez l'entité qui se termine par _action (ex: sensor.ma_telecommande_action)"
       selector:
         entity:
           domain: sensor
@@ -40,7 +40,7 @@ max_exceeded: silent
 trigger:
   - platform: state
     entity_id: !input action_sensor
-    # On ignore les changements d'état vides ou nuls qui arrivent parfois après le clic
+    # On ignore les changements d'état vides ou nuls
     not_to: 
       - ""
       - "None"
