@@ -1,12 +1,12 @@
 blueprint:
-  name: Sunricher ZGRC-KEY-013 (Sélecteur Liste)
-  description: Contrôle 4 groupes de lumières via Zigbee2MQTT (Sélection via liste)
+  name: Sunricher ZGRC-KEY-013 (Selecteur Liste)
+  description: Controle 4 groupes de lumieres via Zigbee2MQTT
   domain: automation
 
   input:
     action_sensor:
-      name: Capteur Action de la télécommande
-      description: "Sélectionnez l'entité qui se termine par _action (ex: sensor.ma_telecommande_action)"
+      name: Capteur Action
+      description: Selectionnez entite se terminant par _action
       selector:
         entity:
           domain: sensor
@@ -40,7 +40,6 @@ max_exceeded: silent
 trigger:
   - platform: state
     entity_id: !input action_sensor
-    # On ignore les changements d'état vides ou nuls
     not_to: 
       - ""
       - "None"
