@@ -1,31 +1,39 @@
 blueprint:
-  name: Sunricher ZGRC-KEY-013 Zigbee2MQTT ULTIMATE (brightness_move_up_X)
+  name: Sunricher ZGRC-KEY-013 Zigbee2MQTT HA Groups
+  description: Control 4 HA light groups with Sunricher remote
   domain: automation
 
   input:
     remote_name:
-      name: Friendly name remote
+      name: Zigbee2MQTT friendly name of remote
       selector:
         text:
 
-    group1:
-      name: Z2M group name 1
+    light_g1:
+      name: Light group 1
       selector:
-        text:
-    group2:
-      name: Z2M group name 2
-      selector:
-        text:
-    group3:
-      name: Z2M group name 3
-      selector:
-        text:
-    group4:
-      name: Z2M group name 4
-      selector:
-        text:
+        entity:
+          domain: light
 
-mode: parallel
+    light_g2:
+      name: Light group 2
+      selector:
+        entity:
+          domain: light
+
+    light_g3:
+      name: Light group 3
+      selector:
+        entity:
+          domain: light
+
+    light_g4:
+      name: Light group 4
+      selector:
+        entity:
+          domain: light
+
+mode: restart
 max_exceeded: silent
 
 trigger:
@@ -36,10 +44,6 @@ variables:
   remote: !input remote_name
   topic: "{{ trigger.topic }}"
   action: "{{ trigger.payload }}"
-  g1: !input group1
-  g2: !input group2
-  g3: !input group3
-  g4: !input group4
 
 condition:
   - "{{ topic == 'zigbee2mqtt/' ~ remote ~ '/action' }}"
@@ -47,154 +51,69 @@ condition:
 action:
   - choose:
 
-      ################################################
+      ############################
       # GROUP 1
-      ################################################
+      ############################
       - conditions: "{{ action == 'on_1' }}"
         sequence:
-          - service: mqtt.publish
-            data:
-              topic: "zigbee2mqtt/{{ g1 }}/set"
-              payload: '{"state":"ON"}'
+          - service: light.turn_on
+            target:
+              entity_id: !input light_g1
 
       - conditions: "{{ action == 'off_1' }}"
         sequence:
-          - service: mqtt.publish
-            data:
-              topic: "zigbee2mqtt/{{ g1 }}/set"
-              payload: '{"state":"OFF"}'
+          - service: light.turn_off
+            target:
+              entity_id: !input light_g1
 
       - conditions: "{{ action == 'brightness_move_up_1' }}"
         sequence:
-          - service: mqtt.publish
+          - service: light.turn_on
+            target:
+              entity_id: !input light_g1
             data:
-              topic: "zigbee2mqtt/{{ g1 }}/set"
-              payload: '{"brightness_move": 80}'
+              brightness_step: 15
 
       - conditions: "{{ action == 'brightness_move_down_1' }}"
         sequence:
-          - service: mqtt.publish
+          - service: light.turn_on
+            target:
+              entity_id: !input light_g1
             data:
-              topic: "zigbee2mqtt/{{ g1 }}/set"
-              payload: '{"brightness_move": -80}'
+              brightness_step: -15
 
-      - conditions: "{{ action == 'brightness_stop_1' }}"
-        sequence:
-          - service: mqtt.publish
-            data:
-              topic: "zigbee2mqtt/{{ g1 }}/set"
-              payload: '{"brightness_move": 0}'
-
-      ################################################
+      ############################
       # GROUP 2
-      ################################################
+      ############################
       - conditions: "{{ action == 'on_2' }}"
         sequence:
-          - service: mqtt.publish
-            data:
-              topic: "zigbee2mqtt/{{ g2 }}/set"
-              payload: '{"state":"ON"}'
+          - service: light.turn_on
+            target:
+              entity_id: !input light_g2
 
       - conditions: "{{ action == 'off_2' }}"
         sequence:
-          - service: mqtt.publish
-            data:
-              topic: "zigbee2mqtt/{{ g2 }}/set"
-              payload: '{"state":"OFF"}'
+          - service: light.turn_off
+            target:
+              entity_id: !input light_g2
 
       - conditions: "{{ action == 'brightness_move_up_2' }}"
         sequence:
-          - service: mqtt.publish
+          - service: light.turn_on
+            target:
+              entity_id: !input light_g2
             data:
-              topic: "zigbee2mqtt/{{ g2 }}/set"
-              payload: '{"brightness_move": 80}'
+              brightness_step: 15
 
       - conditions: "{{ action == 'brightness_move_down_2' }}"
         sequence:
-          - service: mqtt.publish
+          - service: light.turn_on
+            target:
+              entity_id: !input light_g2
             data:
-              topic: "zigbee2mqtt/{{ g2 }}/set"
-              payload: '{"brightness_move": -80}'
+              brightness_step: -15
 
-      - conditions: "{{ action == 'brightness_stop_2' }}"
-        sequence:
-          - service: mqtt.publish
-            data:
-              topic: "zigbee2mqtt/{{ g2 }}/set"
-              payload: '{"brightness_move": 0}'
-
-      ################################################
+      ############################
       # GROUP 3
-      ################################################
-      - conditions: "{{ action == 'on_3' }}"
-        sequence:
-          - service: mqtt.publish
-            data:
-              topic: "zigbee2mqtt/{{ g3 }}/set"
-              payload: '{"state":"ON"}'
-
-      - conditions: "{{ action == 'off_3' }}"
-        sequence:
-          - service: mqtt.publish
-            data:
-              topic: "zigbee2mqtt/{{ g3 }}/set"
-              payload: '{"state":"OFF"}'
-
-      - conditions: "{{ action == 'brightness_move_up_3' }}"
-        sequence:
-          - service: mqtt.publish
-            data:
-              topic: "zigbee2mqtt/{{ g3 }}/set"
-              payload: '{"brightness_move": 80}'
-
-      - conditions: "{{ action == 'brightness_move_down_3' }}"
-        sequence:
-          - service: mqtt.publish
-            data:
-              topic: "zigbee2mqtt/{{ g3 }}/set"
-              payload: '{"brightness_move": -80}'
-
-      - conditions: "{{ action == 'brightness_stop_3' }}"
-        sequence:
-          - service: mqtt.publish
-            data:
-              topic: "zigbee2mqtt/{{ g3 }}/set"
-              payload: '{"brightness_move": 0}'
-
-      ################################################
-      # GROUP 4
-      ################################################
-      - conditions: "{{ action == 'on_4' }}"
-        sequence:
-          - service: mqtt.publish
-            data:
-              topic: "zigbee2mqtt/{{ g4 }}/set"
-              payload: '{"state":"ON"}'
-
-      - conditions: "{{ action == 'off_4' }}"
-        sequence:
-          - service: mqtt.publish
-            data:
-              topic: "zigbee2mqtt/{{ g4 }}/set"
-              payload: '{"state":"OFF"}'
-
-      - conditions: "{{ action == 'brightness_move_up_4' }}"
-        sequence:
-          - service: mqtt.publish
-            data:
-              topic: "zigbee2mqtt/{{ g4 }}/set"
-              payload: '{"brightness_move": 80}'
-
-      - conditions: "{{ action == 'brightness_move_down_4' }}"
-        sequence:
-          - service: mqtt.publish
-            data:
-              topic: "zigbee2mqtt/{{ g4 }}/set"
-              payload: '{"brightness_move": -80}'
-
-      - conditions: "{{ action == 'brightness_stop_4' }}"
-        sequence:
-          - service: mqtt.publish
-            data:
-              topic: "zigbee2mqtt/{{ g4 }}/set"
-              payload: '{"brightness_move": 0}'
+      ############################
+      - co
