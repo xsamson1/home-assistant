@@ -1,0 +1,105 @@
+blueprint:
+  name: Zigbee2MQTT - Sunricher ZGRC-KEY-013
+  description: Contrôle des boutons de la télécommande Sunricher via Zigbee2MQTT
+  domain: automation
+  input:
+    remote:
+      name: Remote Sensor
+      description: Choisissez le capteur "action" de votre télécommande Sunricher (ex. sensor.remote_action)
+      selector:
+        entity:
+          integration: mqtt
+          domain: sensor
+    g1_on_press:
+      name: Group1 On Press
+      default: []
+      selector:
+        action: {}
+    g1_off_press:
+      name: Group1 Off Press
+      default: []
+      selector:
+        action: {}
+    g2_on_press:
+      name: Group2 On Press
+      default: []
+      selector:
+        action: {}
+    g2_off_press:
+      name: Group2 Off Press
+      default: []
+      selector:
+        action: {}
+    g3_on_press:
+      name: Group3 On Press
+      default: []
+      selector:
+        action: {}
+    g3_off_press:
+      name: Group3 Off Press
+      default: []
+      selector:
+        action: {}
+    g4_on_press:
+      name: Group4 On Press
+      default: []
+      selector:
+        action: {}
+    g4_off_press:
+      name: Group4 Off Press
+      default: []
+      selector:
+        action: {}
+    scene1_press:
+      name: Scene1
+      default: []
+      selector:
+        action: {}
+    scene2_press:
+      name: Scene2
+      default: []
+      selector:
+        action: {}
+
+mode: restart # Restart est souvent mieux pour les télécommandes pour éviter les latences
+max_exceeded: silent
+
+trigger:
+  - platform: state
+    entity_id: !input remote
+    # On ne met pas de "to:" pour capturer tous les changements d'état
+
+action:
+  - variables:
+      # Z2M envoie les commandes directement dans l'état de l'entité action
+      action_value: "{{ trigger.to_state.state }}"
+  - choose:
+      # Groupe 1
+      - conditions: "{{ action_value == 'on_l1' }}"
+        sequence: !input g1_on_press
+      - conditions: "{{ action_value == 'off_l1' }}"
+        sequence: !input g1_off_press
+      
+      # Groupe 2
+      - conditions: "{{ action_value == 'on_l2' }}"
+        sequence: !input g2_on_press
+      - conditions: "{{ action_value == 'off_l2' }}"
+        sequence: !input g2_off_press
+      
+      # Groupe 3
+      - conditions: "{{ action_value == 'on_l3' }}"
+        sequence: !input g3_on_press
+      - conditions: "{{ action_value == 'off_l3' }}"
+        sequence: !input g3_off_press
+      
+      # Groupe 4
+      - conditions: "{{ action_value == 'on_l4' }}"
+        sequence: !input g4_on_press
+      - conditions: "{{ action_value == 'off_l4' }}"
+        sequence: !input g4_off_press
+      
+      # Scènes
+      - conditions: "{{ action_value == 'recall_1' }}"
+        sequence: !input scene1_press
+      - conditions: "{{ action_value == 'recall_2' }}"
+        sequence: !input scene2_press
