@@ -1,6 +1,6 @@
 blueprint:
-  name: Sunricher ZGRC-KEY-013 (Turbo Fluide V8)
-  description: Variation ultra-fluide (petits pas rapides). Réglez la vitesse via le délai inter-commande.
+  name: Sunricher ZGRC-KEY-013 (V9 - Expert & Réseau Stable)
+  description: Contrôle total sur la fluidité et la charge réseau Zigbee.
   domain: automation
 
   input:
@@ -12,14 +12,25 @@ blueprint:
           domain: sensor
           multiple: false
 
-    loop_delay:
-      name: Délai entre les commandes (Vitesse)
-      description: "Plus ce chiffre est PETIT, plus la variation est RAPIDE. (Conseillé: 50ms à 100ms)"
-      default: 100
+    dimming_step_pct:
+      name: Taille du Pas (%)
+      description: "De combien % on augmente à chaque boucle. (Conseillé: 10% à 15% pour éviter la saturation)"
+      default: 10
       selector:
         number:
-          min: 10
-          max: 300
+          min: 1
+          max: 25
+          unit_of_measurement: "%"
+          mode: slider
+
+    loop_delay_ms:
+      name: Délai de boucle (ms)
+      description: "Pause entre deux commandes. 250ms est un bon équilibre pour Zigbee. (Conseillé: 200ms à 400ms)"
+      default: 250
+      selector:
+        number:
+          min: 100
+          max: 1000
           unit_of_measurement: "ms"
           mode: slider
 
@@ -44,7 +55,6 @@ blueprint:
         entity:
           domain: light
 
-# Mode Restart obligatoire pour couper la boucle instantanément
 mode: restart
 max_exceeded: silent
 
@@ -60,12 +70,17 @@ trigger:
 action:
   - variables:
       action: "{{ trigger.to_state.state }}"
-      # On convertit les ms en secondes pour le délai (ex: 100ms = 0.1s)
-      delay_ms: !input loop_delay
-      delay_sec: "{{ delay_ms / 1000 }}"
-      # Pas fixe de 4% pour garantir la fluidité visuelle
-      step_up: 4
-      step_down: -4
+      
+      # Récupération des inputs
+      delay_ms: !input loop_delay_ms
+      step_pct: !input dimming_step_pct
+      
+      # Calculs
+      # On convertit le délai en secondes pour la transition (ex: 250ms -> 0.25s)
+      # Cela permet de lisser parfaitement entre deux "grosses" marches.
+      transition_sec: "{{ delay_ms / 1000.0 }}"
+      step_up: "{{ step_pct | int }}"
+      step_down: "{{ -1 * step_pct | int }}"
 
   - choose:
       # =========================================
@@ -85,24 +100,25 @@ action:
       - conditions: "{{ action == 'brightness_move_up_1' }}"
         sequence:
           - repeat:
-              count: 200
+              count: 100
               sequence:
                 - service: light.turn_on
                   target: { entity_id: !input light_g1 }
-                  # Transition égale au délai pour lisser parfaitement
-                  data: { brightness_step_pct: "{{ step_up }}", transition: "{{ delay_sec }}" }
-                - delay: "{{ delay_sec }}"
+                  data: { brightness_step_pct: "{{ step_up }}", transition: "{{ transition_sec }}" }
+                - delay: 
+                    milliseconds: !input loop_delay_ms
 
       # Variation Descendre G1
       - conditions: "{{ action == 'brightness_move_down_1' }}"
         sequence:
           - repeat:
-              count: 200
+              count: 100
               sequence:
                 - service: light.turn_on
                   target: { entity_id: !input light_g1 }
-                  data: { brightness_step_pct: "{{ step_down }}", transition: "{{ delay_sec }}" }
-                - delay: "{{ delay_sec }}"
+                  data: { brightness_step_pct: "{{ step_down }}", transition: "{{ transition_sec }}" }
+                - delay: 
+                    milliseconds: !input loop_delay_ms
 
       # =========================================
       # GROUPE 2
@@ -120,22 +136,24 @@ action:
       - conditions: "{{ action == 'brightness_move_up_2' }}"
         sequence:
           - repeat:
-              count: 200
+              count: 100
               sequence:
                 - service: light.turn_on
                   target: { entity_id: !input light_g2 }
-                  data: { brightness_step_pct: "{{ step_up }}", transition: "{{ delay_sec }}" }
-                - delay: "{{ delay_sec }}"
+                  data: { brightness_step_pct: "{{ step_up }}", transition: "{{ transition_sec }}" }
+                - delay: 
+                    milliseconds: !input loop_delay_ms
 
       - conditions: "{{ action == 'brightness_move_down_2' }}"
         sequence:
           - repeat:
-              count: 200
+              count: 100
               sequence:
                 - service: light.turn_on
                   target: { entity_id: !input light_g2 }
-                  data: { brightness_step_pct: "{{ step_down }}", transition: "{{ delay_sec }}" }
-                - delay: "{{ delay_sec }}"
+                  data: { brightness_step_pct: "{{ step_down }}", transition: "{{ transition_sec }}" }
+                - delay: 
+                    milliseconds: !input loop_delay_ms
 
       # =========================================
       # GROUPE 3
@@ -153,22 +171,24 @@ action:
       - conditions: "{{ action == 'brightness_move_up_3' }}"
         sequence:
           - repeat:
-              count: 200
+              count: 100
               sequence:
                 - service: light.turn_on
                   target: { entity_id: !input light_g3 }
-                  data: { brightness_step_pct: "{{ step_up }}", transition: "{{ delay_sec }}" }
-                - delay: "{{ delay_sec }}"
+                  data: { brightness_step_pct: "{{ step_up }}", transition: "{{ transition_sec }}" }
+                - delay: 
+                    milliseconds: !input loop_delay_ms
 
       - conditions: "{{ action == 'brightness_move_down_3' }}"
         sequence:
           - repeat:
-              count: 200
+              count: 100
               sequence:
                 - service: light.turn_on
                   target: { entity_id: !input light_g3 }
-                  data: { brightness_step_pct: "{{ step_down }}", transition: "{{ delay_sec }}" }
-                - delay: "{{ delay_sec }}"
+                  data: { brightness_step_pct: "{{ step_down }}", transition: "{{ transition_sec }}" }
+                - delay: 
+                    milliseconds: !input loop_delay_ms
 
       # =========================================
       # GROUPE 4
@@ -186,19 +206,21 @@ action:
       - conditions: "{{ action == 'brightness_move_up_4' }}"
         sequence:
           - repeat:
-              count: 200
+              count: 100
               sequence:
                 - service: light.turn_on
                   target: { entity_id: !input light_g4 }
-                  data: { brightness_step_pct: "{{ step_up }}", transition: "{{ delay_sec }}" }
-                - delay: "{{ delay_sec }}"
+                  data: { brightness_step_pct: "{{ step_up }}", transition: "{{ transition_sec }}" }
+                - delay: 
+                    milliseconds: !input loop_delay_ms
 
       - conditions: "{{ action == 'brightness_move_down_4' }}"
         sequence:
           - repeat:
-              count: 200
+              count: 100
               sequence:
                 - service: light.turn_on
                   target: { entity_id: !input light_g4 }
-                  data: { brightness_step_pct: "{{ step_down }}", transition: "{{ delay_sec }}" }
-                - delay: "{{ delay_sec }}"
+                  data: { brightness_step_pct: "{{ step_down }}", transition: "{{ transition_sec }}" }
+                - delay: 
+                    milliseconds: !input loop_delay_ms
