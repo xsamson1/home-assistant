@@ -1,6 +1,6 @@
 blueprint:
-  name: Sunricher ZGRC-KEY-013 (Vitesse Réglable V7)
-  description: Gestion On/Off et Variation avec vitesse réglable via Zigbee2MQTT.
+  name: Sunricher ZGRC-KEY-013 (Turbo Fluide V8)
+  description: Variation ultra-fluide (petits pas rapides). Réglez la vitesse via le délai inter-commande.
   domain: automation
 
   input:
@@ -12,15 +12,15 @@ blueprint:
           domain: sensor
           multiple: false
 
-    dimming_speed:
-      name: Vitesse de variation
-      description: Pourcentage de luminosité par pas (Plus le chiffre est haut, plus ça va vite).
-      default: 5
+    loop_delay:
+      name: Délai entre les commandes (Vitesse)
+      description: "Plus ce chiffre est PETIT, plus la variation est RAPIDE. (Conseillé: 50ms à 100ms)"
+      default: 100
       selector:
         number:
-          min: 1
-          max: 20
-          unit_of_measurement: "%"
+          min: 10
+          max: 300
+          unit_of_measurement: "ms"
           mode: slider
 
     light_g1:
@@ -44,8 +44,7 @@ blueprint:
         entity:
           domain: light
 
-# Le mode restart est OBLIGATOIRE. 
-# C'est lui qui arrête la variation quand le sensor passe à "stop" ou "vide".
+# Mode Restart obligatoire pour couper la boucle instantanément
 mode: restart
 max_exceeded: silent
 
@@ -61,10 +60,12 @@ trigger:
 action:
   - variables:
       action: "{{ trigger.to_state.state }}"
-      speed: !input dimming_speed
-      # On force la vitesse en nombre entier pour les calculs
-      step_up: "{{ speed | int }}"
-      step_down: "{{ -1 * speed | int }}"
+      # On convertit les ms en secondes pour le délai (ex: 100ms = 0.1s)
+      delay_ms: !input loop_delay
+      delay_sec: "{{ delay_ms / 1000 }}"
+      # Pas fixe de 4% pour garantir la fluidité visuelle
+      step_up: 4
+      step_down: -4
 
   - choose:
       # =========================================
@@ -84,23 +85,24 @@ action:
       - conditions: "{{ action == 'brightness_move_up_1' }}"
         sequence:
           - repeat:
-              count: 150 # Permet de varier pendant ~15-20 secondes max sans relâcher
+              count: 200
               sequence:
                 - service: light.turn_on
                   target: { entity_id: !input light_g1 }
-                  data: { brightness_step_pct: "{{ step_up }}", transition: 0.1 }
-                - delay: 0.1
+                  # Transition égale au délai pour lisser parfaitement
+                  data: { brightness_step_pct: "{{ step_up }}", transition: "{{ delay_sec }}" }
+                - delay: "{{ delay_sec }}"
 
       # Variation Descendre G1
       - conditions: "{{ action == 'brightness_move_down_1' }}"
         sequence:
           - repeat:
-              count: 150
+              count: 200
               sequence:
                 - service: light.turn_on
                   target: { entity_id: !input light_g1 }
-                  data: { brightness_step_pct: "{{ step_down }}", transition: 0.1 }
-                - delay: 0.1
+                  data: { brightness_step_pct: "{{ step_down }}", transition: "{{ delay_sec }}" }
+                - delay: "{{ delay_sec }}"
 
       # =========================================
       # GROUPE 2
@@ -115,27 +117,25 @@ action:
           - service: light.turn_off
             target: { entity_id: !input light_g2 }
 
-      # Variation Monter G2
       - conditions: "{{ action == 'brightness_move_up_2' }}"
         sequence:
           - repeat:
-              count: 150
+              count: 200
               sequence:
                 - service: light.turn_on
                   target: { entity_id: !input light_g2 }
-                  data: { brightness_step_pct: "{{ step_up }}", transition: 0.1 }
-                - delay: 0.1
+                  data: { brightness_step_pct: "{{ step_up }}", transition: "{{ delay_sec }}" }
+                - delay: "{{ delay_sec }}"
 
-      # Variation Descendre G2
       - conditions: "{{ action == 'brightness_move_down_2' }}"
         sequence:
           - repeat:
-              count: 150
+              count: 200
               sequence:
                 - service: light.turn_on
                   target: { entity_id: !input light_g2 }
-                  data: { brightness_step_pct: "{{ step_down }}", transition: 0.1 }
-                - delay: 0.1
+                  data: { brightness_step_pct: "{{ step_down }}", transition: "{{ delay_sec }}" }
+                - delay: "{{ delay_sec }}"
 
       # =========================================
       # GROUPE 3
@@ -150,27 +150,25 @@ action:
           - service: light.turn_off
             target: { entity_id: !input light_g3 }
 
-      # Variation Monter G3
       - conditions: "{{ action == 'brightness_move_up_3' }}"
         sequence:
           - repeat:
-              count: 150
+              count: 200
               sequence:
                 - service: light.turn_on
                   target: { entity_id: !input light_g3 }
-                  data: { brightness_step_pct: "{{ step_up }}", transition: 0.1 }
-                - delay: 0.1
+                  data: { brightness_step_pct: "{{ step_up }}", transition: "{{ delay_sec }}" }
+                - delay: "{{ delay_sec }}"
 
-      # Variation Descendre G3
       - conditions: "{{ action == 'brightness_move_down_3' }}"
         sequence:
           - repeat:
-              count: 150
+              count: 200
               sequence:
                 - service: light.turn_on
                   target: { entity_id: !input light_g3 }
-                  data: { brightness_step_pct: "{{ step_down }}", transition: 0.1 }
-                - delay: 0.1
+                  data: { brightness_step_pct: "{{ step_down }}", transition: "{{ delay_sec }}" }
+                - delay: "{{ delay_sec }}"
 
       # =========================================
       # GROUPE 4
@@ -185,24 +183,22 @@ action:
           - service: light.turn_off
             target: { entity_id: !input light_g4 }
 
-      # Variation Monter G4
       - conditions: "{{ action == 'brightness_move_up_4' }}"
         sequence:
           - repeat:
-              count: 150
+              count: 200
               sequence:
                 - service: light.turn_on
                   target: { entity_id: !input light_g4 }
-                  data: { brightness_step_pct: "{{ step_up }}", transition: 0.1 }
-                - delay: 0.1
+                  data: { brightness_step_pct: "{{ step_up }}", transition: "{{ delay_sec }}" }
+                - delay: "{{ delay_sec }}"
 
-      # Variation Descendre G4
       - conditions: "{{ action == 'brightness_move_down_4' }}"
         sequence:
           - repeat:
-              count: 150
+              count: 200
               sequence:
                 - service: light.turn_on
                   target: { entity_id: !input light_g4 }
-                  data: { brightness_step_pct: "{{ step_down }}", transition: 0.1 }
-                - delay: 0.1
+                  data: { brightness_step_pct: "{{ step_down }}", transition: "{{ delay_sec }}" }
+                - delay: "{{ delay_sec }}"
