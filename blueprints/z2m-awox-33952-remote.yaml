@@ -1,0 +1,254 @@
+blueprint:
+  name: AwoX 33952 - Intégrale (V2 - Stable)
+  description: "Contrôle complet: Couleurs, Blancs, Effets et Favoris avec moteur réseau fluide."
+  domain: automation
+
+  input:
+    action_sensor:
+      name: Capteur Action (Z2M)
+      description: "Le sensor qui remonte les clics (ex: sensor.telecommande_action)."
+      selector:
+        entity:
+          domain: sensor
+          multiple: false
+
+    target_light:
+      name: Lampe / Groupe à piloter
+      description: "L'entité lumière."
+      selector:
+        entity:
+          domain: light
+
+    # --- Réglages Favoris (Cœurs) ---
+    scene_heart_1:
+      name: (Optionnel) Scène pour Cœur 1
+      description: "Scène à lancer (ex: Soirée TV). Si vide, mettra du Blanc Chaud à 50%."
+      default: []
+      selector:
+        entity:
+          domain: scene
+          multiple: false
+
+    scene_heart_2:
+      name: (Optionnel) Scène pour Cœur 2
+      description: "Scène à lancer (ex: Lecture). Si vide, mettra du Blanc Froid à 100%."
+      default: []
+      selector:
+        entity:
+          domain: scene
+          multiple: false
+
+    # --- Réglages Techniques ---
+    loop_delay_ms:
+      name: Délai de boucle (ms)
+      description: "Pause entre deux commandes (Fluidité Zigbee)."
+      default: 250
+      selector:
+        number:
+          min: 100
+          max: 1000
+          unit_of_measurement: "ms"
+          mode: slider
+
+    step_pct:
+      name: Pas de Luminosité (%)
+      default: 10
+      selector:
+        number:
+          min: 1
+          max: 25
+          unit_of_measurement: "%"
+          mode: slider
+
+    kelvin_step:
+      name: Pas de Température (Mireds)
+      default: 25
+      selector:
+        number:
+          min: 10
+          max: 100
+          mode: slider
+
+mode: restart
+max_exceeded: silent
+
+trigger:
+  - platform: state
+    entity_id: !input action_sensor
+    not_to:
+      - "unavailable"
+      - "unknown"
+      - "None"
+      - ""
+
+action:
+  - variables:
+      action: "{{ trigger.to_state.state }}"
+      light_entity: !input target_light
+      delay_ms: !input loop_delay_ms
+      step_p: !input step_pct
+      step_k: !input kelvin_step
+      trans_sec: "{{ delay_ms / 1000.0 }}"
+      step_up: "{{ step_p | int }}"
+      step_down: "{{ -1 * step_p | int }}"
+      # Kelvin/Mireds: Sur Z2M, souvent + step = plus chaud (mireds augmente), - step = plus froid.
+      # A inverser si la lampe réagit à l'envers.
+      kelvin_warm: "{{ step_k | int }}"  
+      kelvin_cold: "{{ -1 * step_k | int }}"
+      
+      # Récupération des scènes
+      scene_1: !input scene_heart_1
+      scene_2: !input scene_heart_2
+
+  - choose:
+      # =========================================
+      # 1. HAUT : ON / OFF
+      # =========================================
+      - conditions: "{{ action == 'on' }}"
+        sequence:
+          - service: light.turn_on
+            target: { entity_id: !input target_light }
+            data: { transition: 1 }
+
+      - conditions: "{{ action == 'off' }}"
+        sequence:
+          - service: light.turn_off
+            target: { entity_id: !input target_light }
+            data: { transition: 1 }
+
+      # =========================================
+      # 2. BAS GAUCHE : LUMINOSITÉ (Soleils)
+      # =========================================
+      # Monter (Grand soleil)
+      - conditions: "{{ action in ['brightness_move_up', 'brightness_step_up'] }}"
+        sequence:
+          - repeat:
+              count: 20
+              sequence:
+                - service: light.turn_on
+                  target: { entity_id: !input target_light }
+                  data: { brightness_step_pct: "{{ step_up }}", transition: "{{ trans_sec }}" }
+                - delay: { milliseconds: !input loop_delay_ms }
+
+      # Descendre (Petit soleil)
+      - conditions: "{{ action in ['brightness_move_down', 'brightness_step_down'] }}"
+        sequence:
+          - repeat:
+              count: 20
+              sequence:
+                - service: light.turn_on
+                  target: { entity_id: !input target_light }
+                  data: { brightness_step_pct: "{{ step_down }}", transition: "{{ trans_sec }}" }
+                - delay: { milliseconds: !input loop_delay_ms }
+
+      # =========================================
+      # 3. BAS DROITE : TEMPÉRATURE (Etoile/Flocon)
+      # =========================================
+      # Plus Froid/Blanc (Souvent icone Etoile/Soleil Blanc en haut ou Flocon)
+      # Note: Vérifier si ton bouton haut envoie 'color_temperature_step_up' ou 'down'
+      - conditions: "{{ action in ['color_temperature_move_up', 'color_temperature_step_up'] }}"
+        sequence:
+          - repeat:
+              count: 20
+              sequence:
+                - service: light.turn_on
+                  target: { entity_id: !input target_light }
+                  data: { color_temp_step: "{{ kelvin_cold }}", transition: "{{ trans_sec }}" }
+                - delay: { milliseconds: !input loop_delay_ms }
+
+      # Plus Chaud/Jaune
+      - conditions: "{{ action in ['color_temperature_move_down', 'color_temperature_step_down'] }}"
+        sequence:
+          - repeat:
+              count: 20
+              sequence:
+                - service: light.turn_on
+                  target: { entity_id: !input target_light }
+                  data: { color_temp_step: "{{ kelvin_warm }}", transition: "{{ trans_sec }}" }
+                - delay: { milliseconds: !input loop_delay_ms }
+
+      # =========================================
+      # 4. BAS CENTRE-GAUCHE : MODES (Flèches)
+      # =========================================
+      # HAUT (Refresh) -> Reset Blanc
+      - conditions: "{{ action in ['recall_1', 'mode_white', 'white_mode'] }}" 
+        sequence:
+          - service: light.turn_on
+            target: { entity_id: !input target_light }
+            data: { kelvin: 4000, brightness_pct: 100, effect: "None" }
+
+      # BAS (Cercle Couleur) -> Color Loop
+      - conditions: "{{ action in ['color_loop_set', 'effect_colorloop', 'recall_2'] }}"
+        sequence:
+           - choose:
+              # Si déjà en loop, on arrête
+              - conditions: "{{ state_attr(light_entity, 'effect') == 'colorloop' }}"
+                sequence:
+                  - service: light.turn_on
+                    target: { entity_id: !input target_light }
+                    data: { effect: "stop" }
+              # Sinon on lance
+              - conditions: "{{ state_attr(light_entity, 'effect') != 'colorloop' }}"
+                sequence:
+                  - service: light.turn_on
+                    target: { entity_id: !input target_light }
+                    data: { effect: "colorloop", brightness_pct: 100 }
+
+      # =========================================
+      # 5. BAS CENTRE-DROITE : FAVORIS (Cœurs)
+      # =========================================
+      # Cœur 1 (Haut)
+      - conditions: "{{ action in ['store_1', 'recall_3', 'scene_1'] }}"
+        sequence:
+          - choose:
+              - conditions: "{{ scene_1 != none }}"
+                sequence:
+                  - service: scene.turn_on
+                    target: { entity_id: !input scene_heart_1 }
+            default:
+              # Défaut: Chaud et Tamisé
+              - service: light.turn_on
+                target: { entity_id: !input target_light }
+                data: { kelvin: 2700, brightness_pct: 30, effect: "stop" }
+
+      # Cœur 2 (Bas)
+      - conditions: "{{ action in ['store_2', 'recall_4', 'scene_2'] }}"
+        sequence:
+          - choose:
+              - conditions: "{{ scene_2 != none }}"
+                sequence:
+                  - service: scene.turn_on
+                    target: { entity_id: !input scene_heart_2 }
+            default:
+              # Défaut: Froid et Fort
+              - service: light.turn_on
+                target: { entity_id: !input target_light }
+                data: { kelvin: 6000, brightness_pct: 100, effect: "stop" }
+
+      # =========================================
+      # 6. COULEURS DIRECTES (Disque)
+      # =========================================
+      # Les noms peuvent varier (check tes logs Z2M si ça ne marche pas)
+      - conditions: "{{ action in ['color_move_red', 'recall_5'] }}"
+        sequence:
+          - service: light.turn_on
+            target: { entity_id: !input target_light }
+            data: { rgb_color: [255, 0, 0], brightness_pct: 100, effect: "stop" }
+
+      - conditions: "{{ action in ['color_move_green', 'recall_6'] }}"
+        sequence:
+          - service: light.turn_on
+            target: { entity_id: !input target_light }
+            data: { rgb_color: [0, 255, 0], brightness_pct: 100, effect: "stop" }
+
+      - conditions: "{{ action in ['color_move_blue', 'recall_7'] }}"
+        sequence:
+          - service: light.turn_on
+            target: { entity_id: !input target_light }
+            data: { rgb_color: [0, 0, 255], brightness_pct: 100, effect: "stop" }
+
+      - conditions: "{{ action in ['color_move_yellow', 'recall_8'] }}"
+        sequence:
+          - service: light.turn_on
+            target: { entity_id: !input target_light }
+            data: { rgb_color: [255, 220, 0], brightness_pct: 100, effect: "stop" }
