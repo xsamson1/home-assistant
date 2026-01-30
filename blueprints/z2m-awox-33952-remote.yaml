@@ -1,6 +1,6 @@
 blueprint:
-  name: AwoX 33952 - Spécial Yeelight (V7)
-  description: "V7 : Force le changement de température par calcul (Fix Yeelight) et gère l'effet Slowdown."
+  name: AwoX 33952 - Spécial Yeelight (V8 - Tout Calculé)
+  description: "V8 : Force absolue pour Luminosité ET Température. Plus fiable pour Yeelight."
   domain: automation
 
   input:
@@ -33,6 +33,7 @@ blueprint:
     # --- Réglages ---
     step_pct:
       name: Pas de Luminosité (%)
+      description: "Pourcentage de luminosité ajouté/enlevé à chaque clic."
       default: 15
       selector:
         number:
@@ -70,19 +71,28 @@ action:
       step_p: !input step_pct
       step_k: !input kelvin_step
       
-      # --- CALCULS LUMINOSITÉ ---
-      step_up: "{{ step_p | int }}"
-      step_down: "{{ -1 * step_p | int }}"
+      # ====================================================
+      # 1. CALCULS LUMINOSITÉ (0 à 255)
+      # ====================================================
+      # On récupère la luminosité actuelle (0 si éteint)
+      current_bri: "{{ state_attr(light_entity, 'brightness') | int(default=0) }}"
       
-      # --- CALCULS TEMPÉRATURE (Spécial Yeelight) ---
-      # On récupère la valeur actuelle. Si absente (mode couleur), on prend 370 (Blanc Neutre/Chaud)
+      # On convertit le pourcentage choisi (ex: 10%) en valeur sur 255 (ex: 25)
+      step_bri: "{{ (step_p / 100.0 * 255) | int }}"
+
+      # On calcule la suite en bornant entre 5 (minimum visible) et 255 (max)
+      # On évite 0 pour ne pas éteindre la lampe par erreur (bouton OFF est là pour ça)
+      next_bri_up: "{{ [ (current_bri + step_bri), 255 ] | min }}"
+      next_bri_down: "{{ [ (current_bri - step_bri), 5 ] | max }}"
+
+      # ====================================================
+      # 2. CALCULS TEMPÉRATURE (Mireds)
+      # ====================================================
+      # Valeur actuelle ou 370 (neutre) si inconnue
       current_mireds: "{{ state_attr(light_entity, 'color_temp') | int(default=370) }}"
-      
-      # Bornes des Yeelights (souvent 153 à 588)
       min_mireds: 153
       max_mireds: 500
 
-      # Calcul de la prochaine valeur (Bornée entre min et max)
       # Plus Chaud (Warm) = Mireds Augmentent
       next_warm: "{{ [ (current_mireds + step_k), max_mireds ] | min }}"
       # Plus Froid (Cold) = Mireds Diminuent
@@ -103,32 +113,32 @@ action:
             target: { entity_id: !input target_light }
 
       # =========================================
-      # 2. LUMINOSITÉ
+      # 2. LUMINOSITÉ (Calculée)
       # =========================================
       - conditions: "{{ action == 'brightness_step_up' }}"
         sequence:
           - service: light.turn_on
             target: { entity_id: !input target_light }
-            data: { brightness_step_pct: "{{ step_up }}", transition: 0.2 }
+            data: { brightness: "{{ next_bri_up }}", transition: 0.2 }
 
       - conditions: "{{ action == 'brightness_step_down' }}"
         sequence:
           - service: light.turn_on
             target: { entity_id: !input target_light }
-            data: { brightness_step_pct: "{{ step_down }}", transition: 0.2 }
+            data: { brightness: "{{ next_bri_down }}", transition: 0.2 }
 
       # =========================================
-      # 3. TEMPÉRATURE (Méthode Absolue)
+      # 3. TEMPÉRATURE (Calculée)
       # =========================================
       
-      # Bouton HAUT (Soleil/Etoile) -> Vers le FROID (Moins de Mireds)
+      # Bouton HAUT (Soleil/Etoile) -> Vers le FROID
       - conditions: "{{ action == 'color_temperature_step_up' }}"
         sequence:
           - service: light.turn_on
             target: { entity_id: !input target_light }
             data: { color_temp: "{{ next_cold }}", transition: 0.2 }
 
-      # Bouton BAS (Flocon/Soleil) -> Vers le CHAUD (Plus de Mireds)
+      # Bouton BAS (Flocon/Soleil) -> Vers le CHAUD
       - conditions: "{{ action == 'color_temperature_step_down' }}"
         sequence:
           - service: light.turn_on
@@ -158,40 +168,4 @@ action:
                 sequence:
                   - service: light.turn_on
                     target: { entity_id: !input target_light }
-                    data: { effect: "slowdown", brightness_pct: 100 }
-
-      # =========================================
-      # 5. COULEURS
-      # =========================================
-      - conditions: "{{ action == 'red' }}"
-        sequence:
-          - service: light.turn_on
-            target: { entity_id: !input target_light }
-            data: { rgb_color: [255, 0, 0], brightness_pct: 100, effect: "stop" }
-
-      - conditions: "{{ action == 'green' }}"
-        sequence:
-          - service: light.turn_on
-            target: { entity_id: !input target_light }
-            data: { rgb_color: [0, 255, 0], brightness_pct: 100, effect: "stop" }
-
-      - conditions: "{{ action == 'blue' }}"
-        sequence:
-          - service: light.turn_on
-            target: { entity_id: !input target_light }
-            data: { rgb_color: [0, 0, 255], brightness_pct: 100, effect: "stop" }
-
-      - conditions: "{{ action == 'yellow' }}"
-        sequence:
-          - service: light.turn_on
-            target: { entity_id: !input target_light }
-            data: { rgb_color: [255, 220, 0], brightness_pct: 100, effect: "stop" }
-
-      # =========================================
-      # 6. FAVORIS (Cœurs)
-      # =========================================
-      - conditions: "{{ action in ['recall_1', 'store_1', 'scene_1'] }}"
-        sequence: !input heart_1_action
-
-      - conditions: "{{ action in ['recall_2', 'store_2', 'scene_2'] }}"
-        sequence: !input heart_2_action
+                    data: { effect: "slowdown
