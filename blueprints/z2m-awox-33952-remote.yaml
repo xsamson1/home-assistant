@@ -1,6 +1,6 @@
 blueprint:
-  name: AwoX 33952 - Direct (V5 - Force & Effets)
-  description: "V5 : Pas de température plus grand, effet Colorloop forcé et codes Cœurs standards."
+  name: AwoX 33952 - Spécial Yeelight (V7)
+  description: "V7 : Force le changement de température par calcul (Fix Yeelight) et gère l'effet Slowdown."
   domain: automation
 
   input:
@@ -12,7 +12,7 @@ blueprint:
           multiple: false
 
     target_light:
-      name: Lampe / Groupe à piloter
+      name: Lampe Yeelight
       selector:
         entity:
           domain: light
@@ -20,14 +20,12 @@ blueprint:
     # --- Actions Cœurs ---
     heart_1_action:
       name: Action Cœur 1 (Haut)
-      description: "Si le code est 'recall_1' ou 'scene_1'"
       default: []
       selector:
         action: {}
 
     heart_2_action:
       name: Action Cœur 2 (Bas)
-      description: "Si le code est 'recall_2' ou 'scene_2'"
       default: []
       selector:
         action: {}
@@ -45,12 +43,12 @@ blueprint:
 
     kelvin_step:
       name: Pas de Température (Mireds)
-      description: "Augmentez ce chiffre (ex: 80) si le changement de blanc est invisible."
-      default: 80
+      description: "Force du changement chaud/froid."
+      default: 50
       selector:
         number:
           min: 10
-          max: 200
+          max: 150
           mode: slider
 
 mode: restart
@@ -72,15 +70,23 @@ action:
       step_p: !input step_pct
       step_k: !input kelvin_step
       
-      # Calculs
+      # --- CALCULS LUMINOSITÉ ---
       step_up: "{{ step_p | int }}"
       step_down: "{{ -1 * step_p | int }}"
       
-      # Mireds : 
-      # UP (Augmenter Mireds) = Vers le JAUNE/CHAUD
-      # DOWN (Baisser Mireds) = Vers le BLEU/FROID
-      mireds_warmer: "{{ step_k | int }}"
-      mireds_colder: "{{ -1 * step_k | int }}"
+      # --- CALCULS TEMPÉRATURE (Spécial Yeelight) ---
+      # On récupère la valeur actuelle. Si absente (mode couleur), on prend 370 (Blanc Neutre/Chaud)
+      current_mireds: "{{ state_attr(light_entity, 'color_temp') | int(default=370) }}"
+      
+      # Bornes des Yeelights (souvent 153 à 588)
+      min_mireds: 153
+      max_mireds: 500
+
+      # Calcul de la prochaine valeur (Bornée entre min et max)
+      # Plus Chaud (Warm) = Mireds Augmentent
+      next_warm: "{{ [ (current_mireds + step_k), max_mireds ] | min }}"
+      # Plus Froid (Cold) = Mireds Diminuent
+      next_cold: "{{ [ (current_mireds - step_k), min_mireds ] | max }}"
 
   - choose:
       # =========================================
@@ -97,7 +103,7 @@ action:
             target: { entity_id: !input target_light }
 
       # =========================================
-      # 2. LUMINOSITÉ (Soleils)
+      # 2. LUMINOSITÉ
       # =========================================
       - conditions: "{{ action == 'brightness_step_up' }}"
         sequence:
@@ -112,45 +118,50 @@ action:
             data: { brightness_step_pct: "{{ step_down }}", transition: 0.2 }
 
       # =========================================
-      # 3. TEMPÉRATURE (Etoile/Flocon)
+      # 3. TEMPÉRATURE (Méthode Absolue)
       # =========================================
-      # NOTE : Si les boutons sont inversés, inversez mireds_warmer et colder ici
       
-      # Step UP (Souvent Soleil) -> On chauffe
+      # Bouton HAUT (Soleil/Etoile) -> Vers le FROID (Moins de Mireds)
       - conditions: "{{ action == 'color_temperature_step_up' }}"
         sequence:
           - service: light.turn_on
             target: { entity_id: !input target_light }
-            data: { color_temp_step: "{{ mireds_warmer }}", transition: 0.2 }
+            data: { color_temp: "{{ next_cold }}", transition: 0.2 }
 
-      # Step DOWN (Souvent Flocon) -> On refroidit
+      # Bouton BAS (Flocon/Soleil) -> Vers le CHAUD (Plus de Mireds)
       - conditions: "{{ action == 'color_temperature_step_down' }}"
         sequence:
           - service: light.turn_on
             target: { entity_id: !input target_light }
-            data: { color_temp_step: "{{ mireds_colder }}", transition: 0.2 }
+            data: { color_temp: "{{ next_warm }}", transition: 0.2 }
 
       # =========================================
-      # 4. MODES (Flèches centrales)
+      # 4. MODES
       # =========================================
-      # HAUT (Refresh) -> Reset Blanc Neutre
+      # REFRESH -> Reset Blanc Neutre
       - conditions: "{{ action == 'refresh' }}" 
         sequence:
           - service: light.turn_on
             target: { entity_id: !input target_light }
             data: { kelvin: 4000, brightness_pct: 100, effect: "None" }
 
-      # BAS (Light Movement) -> FORCE COLOR LOOP
+      # LIGHT MOVEMENT -> SLOWDOWN
       - conditions: "{{ action == 'light_movement' }}"
         sequence:
-          - service: light.turn_on
-            target: { entity_id: !input target_light }
-            data: 
-              effect: "colorloop"
-              brightness_pct: 100
+           - choose:
+              - conditions: "{{ state_attr(light_entity, 'effect') == 'slowdown' }}"
+                sequence:
+                  - service: light.turn_on
+                    target: { entity_id: !input target_light }
+                    data: { effect: "stop" }
+              - conditions: "{{ state_attr(light_entity, 'effect') != 'slowdown' }}"
+                sequence:
+                  - service: light.turn_on
+                    target: { entity_id: !input target_light }
+                    data: { effect: "slowdown", brightness_pct: 100 }
 
       # =========================================
-      # 5. COULEURS (Disque)
+      # 5. COULEURS
       # =========================================
       - conditions: "{{ action == 'red' }}"
         sequence:
@@ -177,9 +188,8 @@ action:
             data: { rgb_color: [255, 220, 0], brightness_pct: 100, effect: "stop" }
 
       # =========================================
-      # 6. FAVORIS (Cœurs) - Essai de codes
+      # 6. FAVORIS (Cœurs)
       # =========================================
-      # Regarde dans le journal si ces codes apparaissent quand tu cliques
       - conditions: "{{ action in ['recall_1', 'store_1', 'scene_1'] }}"
         sequence: !input heart_1_action
 
