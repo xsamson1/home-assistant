@@ -168,4 +168,40 @@ action:
                 sequence:
                   - service: light.turn_on
                     target: { entity_id: !input target_light }
-                    data: { effect: "slowdown
+                    data: { effect: "slowdown", brightness_pct: 100 }
+
+      # =========================================
+      # 5. COULEURS (Disque)
+      # =========================================
+      - conditions: "{{ action == 'red' }}"
+        sequence:
+          - service: light.turn_on
+            target: { entity_id: !input target_light }
+            data: { rgb_color: [255, 0, 0], brightness_pct: 100, effect: "stop" }
+
+      - conditions: "{{ action == 'green' }}"
+        sequence:
+          - service: light.turn_on
+            target: { entity_id: !input target_light }
+            data: { rgb_color: [0, 255, 0], brightness_pct: 100, effect: "stop" }
+
+      - conditions: "{{ action == 'blue' }}"
+        sequence:
+          - service: light.turn_on
+            target: { entity_id: !input target_light }
+            data: { rgb_color: [0, 0, 255], brightness_pct: 100, effect: "stop" }
+
+      - conditions: "{{ action == 'yellow' }}"
+        sequence:
+          - service: light.turn_on
+            target: { entity_id: !input target_light }
+            data: { rgb_color: [255, 220, 0], brightness_pct: 100, effect: "stop" }
+
+      # =========================================
+      # 6. FAVORIS (Cœurs)
+      # =========================================
+      - conditions: "{{ action in ['recall_1', 'store_1', 'scene_1'] }}"
+        sequence: !input heart_1_action
+
+      - conditions: "{{ action in ['recall_2', 'store_2', 'scene_2'] }}"
+        sequence: !input heart_2_action
