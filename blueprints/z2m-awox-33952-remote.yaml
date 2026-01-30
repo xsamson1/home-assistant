@@ -1,12 +1,11 @@
 blueprint:
-  name: AwoX 33952 - Direct (V4 - Simple & Rapide)
-  description: "Version optimisée avec vos codes : 1 clic = 1 action immédiate."
+  name: AwoX 33952 - Direct (V5 - Force & Effets)
+  description: "V5 : Pas de température plus grand, effet Colorloop forcé et codes Cœurs standards."
   domain: automation
 
   input:
     action_sensor:
       name: Capteur Action (Z2M)
-      description: "Le sensor qui remonte les clics."
       selector:
         entity:
           domain: sensor
@@ -18,17 +17,17 @@ blueprint:
         entity:
           domain: light
 
-    # --- Actions Cœurs (Si jamais tu trouves leurs codes plus tard) ---
+    # --- Actions Cœurs ---
     heart_1_action:
       name: Action Cœur 1 (Haut)
-      description: "Action optionnelle."
+      description: "Si le code est 'recall_1' ou 'scene_1'"
       default: []
       selector:
         action: {}
 
     heart_2_action:
       name: Action Cœur 2 (Bas)
-      description: "Action optionnelle."
+      description: "Si le code est 'recall_2' ou 'scene_2'"
       default: []
       selector:
         action: {}
@@ -36,23 +35,22 @@ blueprint:
     # --- Réglages ---
     step_pct:
       name: Pas de Luminosité (%)
-      description: "Pourcentage ajouté/enlevé à chaque clic."
-      default: 10
+      default: 15
       selector:
         number:
           min: 5
-          max: 30
+          max: 50
           unit_of_measurement: "%"
           mode: slider
 
     kelvin_step:
       name: Pas de Température (Mireds)
-      description: "Quantité de changement chaud/froid à chaque clic."
-      default: 40
+      description: "Augmentez ce chiffre (ex: 80) si le changement de blanc est invisible."
+      default: 80
       selector:
         number:
           min: 10
-          max: 100
+          max: 200
           mode: slider
 
 mode: restart
@@ -71,17 +69,18 @@ action:
   - variables:
       action: "{{ trigger.to_state.state }}"
       light_entity: !input target_light
-      # Réglages
       step_p: !input step_pct
       step_k: !input kelvin_step
-      # Calculs simples
+      
+      # Calculs
       step_up: "{{ step_p | int }}"
       step_down: "{{ -1 * step_p | int }}"
-      # Mireds : Plus le chiffre est grand, plus c'est chaud.
-      # Donc "Step Up" (vers le froid/soleil) = réduire mireds
-      # "Step Down" (vers le chaud) = augmenter mireds
-      mireds_colder: "{{ -1 * step_k | int }}"
+      
+      # Mireds : 
+      # UP (Augmenter Mireds) = Vers le JAUNE/CHAUD
+      # DOWN (Baisser Mireds) = Vers le BLEU/FROID
       mireds_warmer: "{{ step_k | int }}"
+      mireds_colder: "{{ -1 * step_k | int }}"
 
   - choose:
       # =========================================
@@ -91,13 +90,11 @@ action:
         sequence:
           - service: light.turn_on
             target: { entity_id: !input target_light }
-            data: { transition: 0.5 }
 
       - conditions: "{{ action == 'off' }}"
         sequence:
           - service: light.turn_off
             target: { entity_id: !input target_light }
-            data: { transition: 0.5 }
 
       # =========================================
       # 2. LUMINOSITÉ (Soleils)
@@ -117,19 +114,21 @@ action:
       # =========================================
       # 3. TEMPÉRATURE (Etoile/Flocon)
       # =========================================
-      # Step UP = Souvent icone Soleil/Etoile (Froid)
+      # NOTE : Si les boutons sont inversés, inversez mireds_warmer et colder ici
+      
+      # Step UP (Souvent Soleil) -> On chauffe
       - conditions: "{{ action == 'color_temperature_step_up' }}"
         sequence:
           - service: light.turn_on
             target: { entity_id: !input target_light }
-            data: { color_temp_step: "{{ mireds_colder }}", transition: 0.2 }
+            data: { color_temp_step: "{{ mireds_warmer }}", transition: 0.2 }
 
-      # Step DOWN = Souvent icone Chaud
+      # Step DOWN (Souvent Flocon) -> On refroidit
       - conditions: "{{ action == 'color_temperature_step_down' }}"
         sequence:
           - service: light.turn_on
             target: { entity_id: !input target_light }
-            data: { color_temp_step: "{{ mireds_warmer }}", transition: 0.2 }
+            data: { color_temp_step: "{{ mireds_colder }}", transition: 0.2 }
 
       # =========================================
       # 4. MODES (Flèches centrales)
@@ -141,22 +140,14 @@ action:
             target: { entity_id: !input target_light }
             data: { kelvin: 4000, brightness_pct: 100, effect: "None" }
 
-      # BAS (Light Movement) -> Color Loop
+      # BAS (Light Movement) -> FORCE COLOR LOOP
       - conditions: "{{ action == 'light_movement' }}"
         sequence:
-           - choose:
-              # Si effet déjà actif, on stop
-              - conditions: "{{ state_attr(light_entity, 'effect') == 'colorloop' }}"
-                sequence:
-                  - service: light.turn_on
-                    target: { entity_id: !input target_light }
-                    data: { effect: "stop" }
-              # Sinon on active
-              - conditions: "{{ state_attr(light_entity, 'effect') != 'colorloop' }}"
-                sequence:
-                  - service: light.turn_on
-                    target: { entity_id: !input target_light }
-                    data: { effect: "colorloop", brightness_pct: 100 }
+          - service: light.turn_on
+            target: { entity_id: !input target_light }
+            data: 
+              effect: "colorloop"
+              brightness_pct: 100
 
       # =========================================
       # 5. COULEURS (Disque)
@@ -186,11 +177,11 @@ action:
             data: { rgb_color: [255, 220, 0], brightness_pct: 100, effect: "stop" }
 
       # =========================================
-      # 6. FAVORIS (Cœurs) - Codes supposés
+      # 6. FAVORIS (Cœurs) - Essai de codes
       # =========================================
-      # Si tu trouves les codes, remplace 'recall_1' ci-dessous
-      - conditions: "{{ action in ['recall_1', 'store_1'] }}"
+      # Regarde dans le journal si ces codes apparaissent quand tu cliques
+      - conditions: "{{ action in ['recall_1', 'store_1', 'scene_1'] }}"
         sequence: !input heart_1_action
 
-      - conditions: "{{ action in ['recall_2', 'store_2'] }}"
+      - conditions: "{{ action in ['recall_2', 'store_2', 'scene_2'] }}"
         sequence: !input heart_2_action
