@@ -1,6 +1,6 @@
 blueprint:
-  name: AwoX 33952 - Spécial Yeelight (V8 - Tout Calculé)
-  description: "V8 : Force absolue pour Luminosité ET Température. Plus fiable pour Yeelight."
+  name: AwoX 33952 - Spécial Yeelight (V9 - Syntax Fix)
+  description: "V9 : Correction de l'erreur de syntaxe sur l'effet Slowdown. Calculs Luminosité/Température inclus."
   domain: automation
 
   input:
@@ -33,7 +33,6 @@ blueprint:
     # --- Réglages ---
     step_pct:
       name: Pas de Luminosité (%)
-      description: "Pourcentage de luminosité ajouté/enlevé à chaque clic."
       default: 15
       selector:
         number:
@@ -44,7 +43,6 @@ blueprint:
 
     kelvin_step:
       name: Pas de Température (Mireds)
-      description: "Force du changement chaud/froid."
       default: 50
       selector:
         number:
@@ -71,31 +69,18 @@ action:
       step_p: !input step_pct
       step_k: !input kelvin_step
       
-      # ====================================================
-      # 1. CALCULS LUMINOSITÉ (0 à 255)
-      # ====================================================
-      # On récupère la luminosité actuelle (0 si éteint)
+      # 1. CALCULS LUMINOSITÉ (0-255)
       current_bri: "{{ state_attr(light_entity, 'brightness') | int(default=0) }}"
-      
-      # On convertit le pourcentage choisi (ex: 10%) en valeur sur 255 (ex: 25)
       step_bri: "{{ (step_p / 100.0 * 255) | int }}"
-
-      # On calcule la suite en bornant entre 5 (minimum visible) et 255 (max)
-      # On évite 0 pour ne pas éteindre la lampe par erreur (bouton OFF est là pour ça)
+      # Sécurité : on ne descend pas sous 5 (pour ne pas éteindre)
       next_bri_up: "{{ [ (current_bri + step_bri), 255 ] | min }}"
       next_bri_down: "{{ [ (current_bri - step_bri), 5 ] | max }}"
 
-      # ====================================================
       # 2. CALCULS TEMPÉRATURE (Mireds)
-      # ====================================================
-      # Valeur actuelle ou 370 (neutre) si inconnue
       current_mireds: "{{ state_attr(light_entity, 'color_temp') | int(default=370) }}"
       min_mireds: 153
       max_mireds: 500
-
-      # Plus Chaud (Warm) = Mireds Augmentent
       next_warm: "{{ [ (current_mireds + step_k), max_mireds ] | min }}"
-      # Plus Froid (Cold) = Mireds Diminuent
       next_cold: "{{ [ (current_mireds - step_k), min_mireds ] | max }}"
 
   - choose:
@@ -119,31 +104,38 @@ action:
         sequence:
           - service: light.turn_on
             target: { entity_id: !input target_light }
-            data: { brightness: "{{ next_bri_up }}", transition: 0.2 }
+            data:
+              brightness: "{{ next_bri_up }}"
+              transition: 0.2
 
       - conditions: "{{ action == 'brightness_step_down' }}"
         sequence:
           - service: light.turn_on
             target: { entity_id: !input target_light }
-            data: { brightness: "{{ next_bri_down }}", transition: 0.2 }
+            data:
+              brightness: "{{ next_bri_down }}"
+              transition: 0.2
 
       # =========================================
       # 3. TEMPÉRATURE (Calculée)
       # =========================================
-      
-      # Bouton HAUT (Soleil/Etoile) -> Vers le FROID
+      # Bouton HAUT -> FROID
       - conditions: "{{ action == 'color_temperature_step_up' }}"
         sequence:
           - service: light.turn_on
             target: { entity_id: !input target_light }
-            data: { color_temp: "{{ next_cold }}", transition: 0.2 }
+            data:
+              color_temp: "{{ next_cold }}"
+              transition: 0.2
 
-      # Bouton BAS (Flocon/Soleil) -> Vers le CHAUD
+      # Bouton BAS -> CHAUD
       - conditions: "{{ action == 'color_temperature_step_down' }}"
         sequence:
           - service: light.turn_on
             target: { entity_id: !input target_light }
-            data: { color_temp: "{{ next_warm }}", transition: 0.2 }
+            data:
+              color_temp: "{{ next_warm }}"
+              transition: 0.2
 
       # =========================================
       # 4. MODES
@@ -153,7 +145,10 @@ action:
         sequence:
           - service: light.turn_on
             target: { entity_id: !input target_light }
-            data: { kelvin: 4000, brightness_pct: 100, effect: "None" }
+            data:
+              kelvin: 4000
+              brightness_pct: 100
+              effect: "None"
 
       # LIGHT MOVEMENT -> SLOWDOWN
       - conditions: "{{ action == 'light_movement' }}"
@@ -163,12 +158,15 @@ action:
                 sequence:
                   - service: light.turn_on
                     target: { entity_id: !input target_light }
-                    data: { effect: "stop" }
+                    data:
+                      effect: "stop"
               - conditions: "{{ state_attr(light_entity, 'effect') != 'slowdown' }}"
                 sequence:
                   - service: light.turn_on
                     target: { entity_id: !input target_light }
-                    data: { effect: "slowdown", brightness_pct: 100 }
+                    data:
+                      effect: "slowdown"
+                      brightness_pct: 100
 
       # =========================================
       # 5. COULEURS (Disque)
@@ -177,25 +175,37 @@ action:
         sequence:
           - service: light.turn_on
             target: { entity_id: !input target_light }
-            data: { rgb_color: [255, 0, 0], brightness_pct: 100, effect: "stop" }
+            data:
+              rgb_color: [255, 0, 0]
+              brightness_pct: 100
+              effect: "stop"
 
       - conditions: "{{ action == 'green' }}"
         sequence:
           - service: light.turn_on
             target: { entity_id: !input target_light }
-            data: { rgb_color: [0, 255, 0], brightness_pct: 100, effect: "stop" }
+            data:
+              rgb_color: [0, 255, 0]
+              brightness_pct: 100
+              effect: "stop"
 
       - conditions: "{{ action == 'blue' }}"
         sequence:
           - service: light.turn_on
             target: { entity_id: !input target_light }
-            data: { rgb_color: [0, 0, 255], brightness_pct: 100, effect: "stop" }
+            data:
+              rgb_color: [0, 0, 255]
+              brightness_pct: 100
+              effect: "stop"
 
       - conditions: "{{ action == 'yellow' }}"
         sequence:
           - service: light.turn_on
             target: { entity_id: !input target_light }
-            data: { rgb_color: [255, 220, 0], brightness_pct: 100, effect: "stop" }
+            data:
+              rgb_color: [255, 220, 0]
+              brightness_pct: 100
+              effect: "stop"
 
       # =========================================
       # 6. FAVORIS (Cœurs)
